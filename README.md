@@ -1,17 +1,41 @@
-# fw-widgets
+# nano-scripts
 
-[ForwardWidgets](https://github.com/InchStudio/ForwardWidgets) 自定义插件集合。
+一些自用的小脚本集合。
 
-## 插件列表
+## 列表
 
-| 插件 | 站点 | 状态 |
+| 子目录 | 站点 | 备注 |
 |---|---|---|
-| [archivebate](./archivebate) | https://archivebate.pro | v1.2.1 修复版 |
-| [jable](./jable) | https://jable.tv | v1.3.0 规范化 `playerType` |
+| [archivebate](./archivebate) | https://archivebate.pro | v1.2.1 修复无声播放 |
+| [jable](./jable) | https://jable.tv | v1.3.0 规范化字段 |
 
-## 开发约定
+## 通过 jsdelivr 加速访问
 
-- 每个插件一个独立子目录，包含主脚本 + 配套调试 driver + 单独 README
-- 主脚本命名沿用上游的 `<名称>-v<版本>.js`
-- 调试 driver 命名 `debug-<名称>.mjs`，依赖 [`@forward-widget/libs`](https://www.npmjs.com/package/@forward-widget/libs)
-- 单个插件的修改原因、根因分析写在该插件的 README 里
+国内/移动端通过 jsdelivr CDN 可以直接拉到 raw 文件，无需访问 GitHub：
+
+```
+https://cdn.jsdelivr.net/gh/akafive/nano-scripts@main/<path>
+```
+
+例如：
+
+```
+https://cdn.jsdelivr.net/gh/akafive/nano-scripts@main/archivebate/Archivebate-v1.2.1.js
+https://cdn.jsdelivr.net/gh/akafive/nano-scripts@main/jable/Jable.js
+```
+
+### 强制刷新 jsdelivr 缓存
+
+更新脚本后，jsdelivr 默认缓存 12 小时（边缘）+ 7 天（浏览器）。要立即生效：
+
+```
+https://purge.jsdelivr.net/gh/akafive/nano-scripts@main/<path>
+```
+
+在浏览器打开 purge URL 即可。
+
+## 目录约定
+
+- 每个子目录一个主题，自带 README 说明改动
+- 主脚本沿用上游命名（`<名称>-v<版本>.js`）
+- 调试 driver 命名 `debug-<名称>.mjs`
