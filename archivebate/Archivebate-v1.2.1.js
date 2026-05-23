@@ -624,34 +624,6 @@ async function resolveMixdrop(embedUrl, pageRef) {
   if (raw.startsWith("//")) raw = "https:" + raw;
   else if (raw.startsWith("/")) raw = embedOrigin + raw;
 
-  // 预览片段检测：mixdrop 对部分视频返回 1-30 秒无音轨预览（完整版需浏览器跑 reCAPTCHA 换签名 URL）。
-  // 这种预览的 mp4 通常 <5MB，正常视频 GB 级。用 Range:0-0 拿 content-range 末尾的总长度判断。
-  if (/\.mp4(\?|$)/i.test(raw)) {
-    try {
-      const probe = await Widget.http.get(raw, {
-        headers: {
-          "User-Agent": UA,
-          "Referer": finalUrl,
-          "Origin": embedOrigin,
-          "Range": "bytes=0-0",
-        },
-      });
-      const ph = (probe && probe.headers) || {};
-      const cr = ph["content-range"] || ph["Content-Range"] || "";
-      const m = cr.match(/\/(\d+)\s*$/);
-      const totalBytes = m ? parseInt(m[1], 10) : 0;
-      if (totalBytes > 0 && totalBytes < 5 * 1024 * 1024) {
-        throw new Error(
-          "此视频被 mixdrop 反爬保护：仅返回 " + (totalBytes / 1024 / 1024).toFixed(2) +
-          " MB 的无音轨预览片段。完整版需浏览器执行 reCAPTCHA 验证，fw 插件无法绕过。请换一个视频再试。"
-        );
-      }
-    } catch (e) {
-      // 只在确认是预览片段时阻塞；其他错误（探测失败、headers 读不到等）继续放行
-      if (/反爬保护/.test(e.message)) throw e;
-    }
-  }
-
   return { videoUrl: raw, referer: finalUrl, origin: embedOrigin };
 }
 
