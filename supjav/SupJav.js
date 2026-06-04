@@ -4,14 +4,14 @@ WidgetMetadata = {
   description: "SupJav ForwardWidgets 插件",
   author: "akafive",
   site: "https://supjav.com",
-  version: "1.1.0",
+  version: "1.1.1",
   requiredVersion: "0.0.2",
   detailCacheDuration: 60,
   modules: [
     {
       title: "搜索",
       description: "搜索 SupJav",
-      requiresWebView: false,
+      requiresWebView: true,
       functionName: "search",
       cacheDuration: 3600,
       params: [
@@ -21,13 +21,14 @@ WidgetMetadata = {
           type: "input",
           description: "番号或关键词",
         },
+        cookieParam(),
         { name: "from", title: "页码", type: "page", description: "页码", value: "1" },
       ],
     },
     {
       title: "最新",
       description: "SupJav 最新影片",
-      requiresWebView: false,
+      requiresWebView: true,
       functionName: "loadPage",
       cacheDuration: 3600,
       params: [
@@ -38,13 +39,14 @@ WidgetMetadata = {
           description: "列表地址",
           value: "https://supjav.com/zh/",
         },
+        cookieParam(),
         { name: "from", title: "页码", type: "page", description: "页码", value: "1" },
       ],
     },
     {
       title: "路径",
       description: "读取 SupJav 任意列表路径",
-      requiresWebView: false,
+      requiresWebView: true,
       functionName: "loadPage",
       cacheDuration: 3600,
       params: [
@@ -55,6 +57,7 @@ WidgetMetadata = {
           description: "例如 https://supjav.com/zh/ 或分类/标签页地址",
           value: "https://supjav.com/zh/",
         },
+        cookieParam(),
         { name: "from", title: "页码", type: "page", description: "页码", value: "1" },
       ],
     },
@@ -68,6 +71,17 @@ const DEFAULT_HEADERS = {
   Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
   "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8,ja;q=0.7",
 };
+const COOKIE_STORAGE_KEY = "supjav.cookie";
+
+function cookieParam() {
+  return {
+    name: "cookie",
+    title: "Cookie（可选）",
+    type: "input",
+    description: "浏览器通过 SupJav 验证后复制 Cookie，常见包含 cf_clearance",
+    value: "",
+  };
+}
 
 async function search(params = {}) {
   const keyword = encodeURIComponent((params.keyword || "").trim());
@@ -81,7 +95,8 @@ async function search(params = {}) {
 }
 
 async function loadPage(params = {}) {
-  const htmlContent = await requestHtml(buildListUrl(params.url || SUPJAV_HOME, params.from), SUPJAV_HOME);
+  const cookie = rememberCookie(params.cookie);
+  const htmlContent = await requestHtml(buildListUrl(params.url || SUPJAV_HOME, params.from), SUPJAV_HOME, cookie);
   return parseHtml(htmlContent);
 }
 
@@ -138,7 +153,8 @@ async function loadDetail(link) {
   }
 
   const pageUrl = absoluteUrl(link, SUPJAV_BASE);
-  const htmlContent = await requestHtml(pageUrl, SUPJAV_HOME);
+  const cookie = getStoredCookie();
+  const htmlContent = await requestHtml(pageUrl, SUPJAV_HOME, cookie);
   const $ = Widget.html.load(htmlContent);
 
   const title = cleanText(
@@ -159,7 +175,7 @@ async function loadDetail(link) {
   let referer = pageUrl;
 
   if (!videoUrl && iframeUrl) {
-    const iframeHtml = await requestHtml(iframeUrl, pageUrl);
+    const iframeHtml = await requestHtml(iframeUrl, pageUrl, cookie);
     videoUrl = absoluteUrl(extractVideoUrl(iframeHtml), iframeUrl);
     referer = iframeUrl;
   }
@@ -184,21 +200,42 @@ async function loadDetail(link) {
   });
 }
 
-async function requestHtml(url, referer) {
+async function requestHtml(url, referer, cookie) {
+  const headers = {
+    ...DEFAULT_HEADERS,
+    Referer: referer || SUPJAV_HOME,
+  };
+  if (cookie) headers.Cookie = cookie;
+
   const response = await Widget.http.get(url, {
-    headers: {
-      ...DEFAULT_HEADERS,
-      Referer: referer || SUPJAV_HOME,
-    },
+    headers,
   });
 
   if (!response || !response.data || typeof response.data !== "string") {
     throw new Error("无法获取有效的HTML内容");
   }
   if (isChallengeHtml(response.data)) {
-    throw new Error("站点返回验证页，无法解析");
+    throw new Error("站点返回验证页，无法解析。请先在浏览器打开 supjav.com 通过验证，再把 Cookie 填到模块参数里；如果 Cookie 仍失效，说明站点验证无法由 Widget.http 复用。");
   }
   return response.data;
+}
+
+function rememberCookie(raw) {
+  const cookie = normalizeCookie(raw);
+  if (cookie && Widget.storage && Widget.storage.set) {
+    Widget.storage.set(COOKIE_STORAGE_KEY, cookie);
+  }
+  return cookie || getStoredCookie();
+}
+
+function getStoredCookie() {
+  if (!Widget.storage || !Widget.storage.get) return "";
+  return normalizeCookie(Widget.storage.get(COOKIE_STORAGE_KEY));
+}
+
+function normalizeCookie(raw) {
+  if (!raw) return "";
+  return String(raw).trim().replace(/^cookie\s*:\s*/i, "").trim();
 }
 
 function buildSearchUrl(encodedKeyword, from) {
