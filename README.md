@@ -6,6 +6,7 @@
 
 | 子目录 | 站点 | 备注 |
 |---|---|---|
+| [123av](./123av) | https://123av.com/zh/dm9 | v1.0.0 列表/搜索/详情/弹幕 |
 | [archivebate](./archivebate) | https://archivebate.pro | v1.2.1 修复无声播放 |
 | [jable](./jable) | https://jable.tv | v1.3.0 规范化字段 |
 | [supjav](./supjav) | https://supjav.com | v1.0.0 ForwardWidgets 插件 |
@@ -21,6 +22,7 @@ https://cdn.jsdelivr.net/gh/akafive/nano-scripts@main/<path>
 例如：
 
 ```
+https://cdn.jsdelivr.net/gh/akafive/nano-scripts@main/123av/123AV.js
 https://cdn.jsdelivr.net/gh/akafive/nano-scripts@main/archivebate/Archivebate-v1.2.1.js
 https://cdn.jsdelivr.net/gh/akafive/nano-scripts@main/jable/Jable.js
 https://cdn.jsdelivr.net/gh/akafive/nano-scripts@main/supjav/SupJav.js
