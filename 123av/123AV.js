@@ -1,31 +1,19 @@
 WidgetMetadata = {
-  id: "forward.123av",
+  id: "123av_int",
   title: "123AV",
-  version: "1.0.0",
-  requiredVersion: "0.0.1",
-  description: "123AV 网页抓取插件，支持列表、分类、搜索、详情、播放地址和通用弹幕。",
+  description: "参考 Jable 写法重写：列表、搜索、详情解析、播放资源和弹幕",
   author: "Forward",
   site: "https://123av.com/zh/dm9",
-  detailCacheDuration: 300,
+  version: "1.1.0",
+  requiredVersion: "0.0.2",
+  detailCacheDuration: 60,
   globalParams: [
     {
       name: "baseUrl",
       title: "站点地址",
       type: "input",
       value: "https://123av.com",
-      placeholders: [{ title: "默认", value: "https://123av.com" }],
-    },
-    {
-      name: "languagePath",
-      title: "语言路径",
-      type: "enumeration",
-      value: "zh",
-      enumOptions: [
-        { title: "中文", value: "zh" },
-        { title: "English", value: "en" },
-        { title: "日本語", value: "ja" },
-        { title: "한국어", value: "ko" },
-      ],
+      placeholders: [{ title: "123AV", value: "https://123av.com" }],
     },
     {
       name: "server",
@@ -37,29 +25,76 @@ WidgetMetadata = {
   ],
   modules: [
     {
-      id: "loadList",
-      title: "影片列表",
-      functionName: "loadList",
-      cacheDuration: 1800,
+      id: "latest",
+      title: "最新",
+      description: "最新影片",
       requiresWebView: false,
+      functionName: "loadPage",
+      cacheDuration: 3600,
       params: [
         {
-          name: "category",
-          title: "分类",
-          type: "enumeration",
-          value: "new-release",
-          enumOptions: [
-            { title: "首页", value: "home" },
-            { title: "最新", value: "new-release" },
-            { title: "热门", value: "trending" },
-            { title: "无码流出", value: "uncensored-leak" },
-            { title: "中文字幕", value: "chinese-subtitle" },
-          ],
+          name: "url",
+          title: "列表地址",
+          type: "constant",
+          value: "https://123av.com/zh/dm9/new-release/?mode=async&function=get_block&block_id=list_videos_common_videos_list",
         },
-        { name: "genreId", title: "标签", type: "input" },
-        { name: "peopleId", title: "演员", type: "input" },
-        { name: "page", title: "页码", type: "page" },
+        sortParam(),
+        pageFromParam(),
       ],
+    },
+    {
+      id: "hot",
+      title: "热门",
+      description: "热门影片",
+      requiresWebView: false,
+      functionName: "loadPage",
+      cacheDuration: 3600,
+      params: [
+        {
+          name: "url",
+          title: "列表地址",
+          type: "constant",
+          value: "https://123av.com/zh/dm9/trending/?mode=async&function=get_block&block_id=list_videos_common_videos_list",
+        },
+        sortParam(),
+        pageFromParam(),
+      ],
+    },
+    {
+      id: "category",
+      title: "分类/路径",
+      description: "按路径浏览",
+      requiresWebView: false,
+      functionName: "loadPage",
+      cacheDuration: 3600,
+      params: [
+        {
+          name: "url",
+          title: "列表地址",
+          type: "input",
+          value: "https://123av.com/zh/dm9/?mode=async&function=get_block&block_id=list_videos_common_videos_list",
+          description: "可填 /zh/dm9/tags/... 或完整列表 URL",
+        },
+        sortParam(),
+        pageFromParam(),
+      ],
+    },
+    {
+      id: "detail",
+      title: "详情解析",
+      description: "输入详情页链接解析播放地址",
+      requiresWebView: false,
+      functionName: "detail",
+      cacheDuration: 3600,
+      params: [{ name: "link", title: "详情页链接", type: "input", value: "" }],
+    },
+    {
+      id: "loadResource",
+      title: "加载资源",
+      functionName: "loadResource",
+      type: "stream",
+      cacheDuration: 3600,
+      params: [],
     },
     {
       id: "searchDanmu",
@@ -90,76 +125,199 @@ WidgetMetadata = {
     title: "搜索",
     functionName: "search",
     params: [
-      {
-        name: "keyword",
-        title: "关键词",
-        type: "input",
-        placeholders: [{ title: "番号 / 标题 / 演员", value: "dm9" }],
-      },
-      { name: "page", title: "页码", type: "page" },
+      { name: "keyword", title: "关键词", type: "input", description: "番号 / 标题 / 演员" },
+      sortParam(),
+      pageFromParam(),
     ],
   },
 };
 
 const DEFAULT_BASE_URL = "https://123av.com";
-const DEFAULT_LANGUAGE_PATH = "zh";
 const DEFAULT_DANMU_SERVER = "https://api.dandanplay.net";
 
-async function loadList(params = {}) {
-  try {
-    const baseUrl = normalizeBaseUrl(params.baseUrl);
-    const url = buildListUrl(params, baseUrl, normalizeLanguagePath(params.languagePath));
-    const html = await requestHtml(url);
-    return parseVideoList(html, baseUrl);
-  } catch (error) {
-    console.error("[123av loadList] 失败:", error.message || error);
-    throw error;
-  }
+function sortParam() {
+  return {
+    name: "sort_by",
+    title: "排序",
+    type: "enumeration",
+    value: "post_date",
+    enumOptions: [
+      { title: "最近更新", value: "post_date" },
+      { title: "最多观看", value: "video_viewed" },
+      { title: "最多收藏", value: "most_favourited" },
+    ],
+  };
+}
+
+function pageFromParam() {
+  return { name: "from", title: "页码", type: "page", value: "1" };
 }
 
 async function search(params = {}) {
-  try {
-    const keyword = cleanText(params.keyword);
-    if (!keyword) return [];
-    const baseUrl = normalizeBaseUrl(params.baseUrl);
-    const languagePath = normalizeLanguagePath(params.languagePath);
-    const page = positiveInt(params.page, 1);
-    const res = await Widget.http.get(`${baseUrl}/${languagePath}/search`, {
-      headers: requestHeaders(baseUrl),
-      params: { keyword, page },
-    });
-    return parseVideoList(res.data || "", baseUrl);
-  } catch (error) {
-    console.error("[123av search] 失败:", error.message || error);
-    throw error;
-  }
+  const keyword = encodeURIComponent(cleanText(params.keyword || params.query || ""));
+  if (!keyword) throw new Error("请输入搜索关键词");
+  const baseUrl = getBaseUrl(params);
+  let url = `${baseUrl}/zh/search/${keyword}/?mode=async&function=get_block&block_id=list_videos_videos_list_search_result&q=${keyword}`;
+  if (params.sort_by) url += `&sort_by=${encodeURIComponent(params.sort_by)}`;
+  if (params.from) url += `&from=${encodeURIComponent(params.from)}`;
+  return loadPage(Object.assign({}, params, { url }));
 }
 
-async function loadDetail(link) {
-  try {
-    const detailPath = parseDetailLink(link);
-    if (!detailPath) return null;
-    const baseUrl = detailPath.indexOf("http") === 0 ? originFromUrl(detailPath) : DEFAULT_BASE_URL;
-    const detailUrl = detailPath.indexOf("http") === 0 ? detailPath : `${DEFAULT_BASE_URL}${detailPath}`;
-    const html = await requestHtml(detailUrl);
-    return parseDetail(html, detailPath, baseUrl);
-  } catch (error) {
-    console.error("[123av loadDetail] 失败:", error.message || error);
-    throw error;
+async function loadPage(params = {}) {
+  const sections = await loadPageSections(params);
+  return sections.flatMap((section) => section.childItems || []);
+}
+
+async function loadPageSections(params = {}) {
+  let url = absoluteUrl(params.url || "", getBaseUrl(params));
+  if (!url) throw new Error("地址不能为空");
+  if (params.sort_by && url.indexOf("sort_by=") < 0) url = appendQuery(url, "sort_by", params.sort_by);
+  if (params.from && url.indexOf("from=") < 0) url = appendQuery(url, "from", params.from);
+
+  const response = await Widget.http.get(url, { headers: defaultHeaders(url, params) });
+  if (!response || typeof response.data !== "string") throw new Error("无法获取有效的HTML内容");
+  if (isChallengeHtml(response.data)) throw new Error("站点返回验证页，无法解析");
+  return parseHtml(response.data, url);
+}
+
+function parseHtml(htmlContent, pageUrl) {
+  const $ = Widget.html.load(htmlContent);
+  const sections = [];
+  const items = [];
+  const seen = {};
+  const cardSelector = ".video-img-box, .video-card, article, .item";
+  const cards = $(cardSelector).toArray ? $(cardSelector).toArray() : $(cardSelector).get();
+
+  for (const card of cards) {
+    const $card = $(card);
+    const $link = findDetailLink($, $card, pageUrl);
+    const link = absoluteUrl($link.attr("href"), pageUrl);
+    if (!isDetailLink(link) || seen[link]) continue;
+
+    const $img = $card.find("img").first();
+    const title = cleanText(
+      $link.attr("title")
+      || $link.text()
+      || $card.find(".title").first().text()
+      || $img.attr("alt")
+      || titleFromUrl(link)
+    );
+    if (!title) continue;
+
+    const poster = absoluteUrl(imageSource($img), pageUrl);
+    const preview = absoluteUrl($img.attr("data-preview") || $card.attr("data-preview"), pageUrl);
+    const duration = cleanText($card.find(".duration, .label, .time").first().text());
+    seen[link] = true;
+    items.push(compactObject({
+      id: link,
+      type: "url",
+      mediaType: "movie",
+      title,
+      posterPath: poster,
+      backdropPath: poster,
+      previewUrl: preview,
+      durationText: duration,
+      releaseDate: duration,
+      link,
+      playerType: "system",
+    }));
   }
+
+  if (items.length === 0) {
+    const anchors = $("a[href]").toArray ? $("a[href]").toArray() : $("a[href]").get();
+    for (const anchor of anchors) {
+      const $anchor = $(anchor);
+      const link = absoluteUrl($anchor.attr("href"), pageUrl);
+      if (!isDetailLink(link) || seen[link]) continue;
+      const title = cleanText($anchor.attr("title") || $anchor.text() || titleFromUrl(link));
+      if (!title) continue;
+      seen[link] = true;
+      items.push(compactObject({ id: link, type: "url", mediaType: "movie", title, link, playerType: "system" }));
+    }
+  }
+
+  if (items.length > 0) sections.push({ title: "123AV", childItems: items });
+  return sections;
+}
+
+async function detail(params = {}) {
+  const link = params.link || params.id;
+  if (!link) throw new Error("缺少详情页链接");
+  return loadDetail(absoluteUrl(link, getBaseUrl(params)), params);
+}
+
+async function loadDetail(link, params = {}) {
+  const url = normalizeDetailLink(link, getBaseUrl(params));
+  if (!url) return null;
+  const response = await Widget.http.get(url, { headers: defaultHeaders(url, params) });
+  if (!response || typeof response.data !== "string") throw new Error("无法获取详情页");
+  if (isChallengeHtml(response.data)) throw new Error("站点返回验证页，无法解析详情");
+  return parseDetailHtml(response.data, url);
+}
+
+async function loadResource(params = {}) {
+  const link = params.link || params.id;
+  if (!link) throw new Error("缺少详情页链接");
+  const info = await loadDetail(link, params);
+  if (!info || !info.videoUrl) throw new Error("未在详情页找到公开 mp4/m3u8 播放地址");
+  return [{
+    name: info.title || "123AV",
+    description: info.videoUrl.indexOf(".m3u8") >= 0 ? "HLS" : "MP4",
+    url: info.videoUrl,
+    headers: {
+      Referer: info.link || link,
+      "User-Agent": defaultUserAgent(),
+    },
+  }];
+}
+
+function parseDetailHtml(html, pageUrl) {
+  const $ = Widget.html.load(html);
+  const title = cleanText(
+    $("meta[property='og:title']").first().attr("content")
+    || $("h1, .title, .video-title").first().text()
+    || titleFromUrl(pageUrl)
+  );
+  const poster = absoluteUrl($("meta[property='og:image']").first().attr("content") || imageSource($("img").first()), pageUrl);
+  const videoUrl = absoluteUrl(extractVideoUrl(html), pageUrl);
+  const description = cleanText($("meta[name='description']").first().attr("content"));
+  const backdropPaths = uniqueStrings([poster].concat($("img").map((_, img) => absoluteUrl(imageSource($(img)), pageUrl)).get()));
+  const relatedSections = parseHtml(html, pageUrl);
+  const relatedItems = relatedSections.flatMap((section) => section.childItems || []).filter((item) => item.link !== pageUrl).slice(0, 12);
+
+  return compactObject({
+    id: pageUrl,
+    type: "url",
+    mediaType: "movie",
+    title,
+    description,
+    posterPath: poster,
+    backdropPath: poster || backdropPaths[0],
+    backdropPaths: backdropPaths.length ? backdropPaths : undefined,
+    videoUrl,
+    previewUrl: videoUrl,
+    genreItems: parseTaxonomy($, pageUrl, "tags"),
+    peoples: parsePeople($, pageUrl),
+    relatedItems: relatedItems.length ? relatedItems : undefined,
+    link: pageUrl,
+    playerType: "system",
+    customHeaders: {
+      Referer: pageUrl,
+      Origin: originFromUrl(pageUrl),
+      "User-Agent": defaultUserAgent(),
+    },
+  });
 }
 
 async function searchDanmu(params = {}) {
   const keyword = cleanText(params.seriesName || params.title);
   if (!keyword) return { animes: [] };
   const server = normalizeBaseUrl(params.server || DEFAULT_DANMU_SERVER);
-  const res = await Widget.http.get(`${server}/api/v2/search/anime`, {
-    params: { keyword },
-  });
+  const res = await Widget.http.get(`${server}/api/v2/search/anime`, { params: { keyword } });
   const animes = (((res.data || {}).animes) || []).map((anime) => ({
     animeId: anime.bangumiId || anime.animeId,
     animeTitle: anime.animeTitle || anime.title || keyword,
-    type: anime.type || params.type || "ova",
+    type: anime.type || params.type || "movie",
   })).filter((anime) => anime.animeId);
   return { animes };
 }
@@ -169,7 +327,7 @@ async function getDetailById(params = {}) {
   const server = normalizeBaseUrl(params.server || DEFAULT_DANMU_SERVER);
   const res = await Widget.http.get(`${server}/api/v2/bangumi/${encodeURIComponent(params.animeId)}`);
   const bangumi = (res.data || {}).bangumi || {};
-  const episodes = bangumi.episodes || res.data.episodes || [];
+  const episodes = bangumi.episodes || (res.data || {}).episodes || [];
   return episodes.map((episode) => ({
     episodeId: episode.episodeId,
     episodeTitle: episode.episodeTitle || episode.title || `第${episode.episodeNumber || ""}集`,
@@ -185,226 +343,145 @@ async function getCommentsById(params = {}) {
   return res.data || { count: 0, comments: [] };
 }
 
-function buildListUrl(params, baseUrl, languagePath) {
-  const page = positiveInt(params.page, 1);
-  let path;
-  if (params.peopleId) {
-    path = `/${languagePath}/dm9/actors/${encodeURIComponent(String(params.peopleId))}`;
-  } else if (params.genreId) {
-    path = `/${languagePath}/dm9/tags/${encodeURIComponent(String(params.genreId))}`;
-  } else {
-    const category = params.category || "new-release";
-    path = category === "home" ? `/${languagePath}/dm9` : `/${languagePath}/dm9/${encodeURIComponent(category)}`;
+function findDetailLink($, $card, pageUrl) {
+  const anchors = $card.find("a[href]").toArray ? $card.find("a[href]").toArray() : $card.find("a[href]").get();
+  for (const anchor of anchors) {
+    const $anchor = $(anchor);
+    const link = absoluteUrl($anchor.attr("href"), pageUrl);
+    if (isDetailLink(link)) return $anchor;
   }
-  if (page > 1) path += `/${page}`;
-  return `${baseUrl}${path}`;
+  return $card.find("a[href]").first();
 }
 
-async function requestHtml(url) {
-  const res = await Widget.http.get(url, { headers: requestHeaders(url) });
-  return String(res.data || "");
+function imageSource($img) {
+  return $img.attr("data-src") || $img.attr("data-original") || $img.attr("data-lazy-src") || $img.attr("src") || "";
 }
 
-function parseVideoList(html, baseUrl) {
-  const $ = Widget.html.load(html);
-  const items = [];
+function parseTaxonomy($, pageUrl, segment) {
   const seen = {};
-  $("a[href*='/v/']").each((_, element) => {
-    const $link = $(element);
-    const href = $link.attr("href");
-    const path = pathFromHref(href);
-    const id = extractVideoId(path);
-    if (!id || seen[path]) return;
+  return $(`a[href*='/${segment}/']`).map((_, anchor) => {
+    const $anchor = $(anchor);
+    const path = pathAndQuery(absoluteUrl($anchor.attr("href"), pageUrl));
+    const title = cleanText($anchor.text() || $anchor.attr("title"));
+    if (!path || !title || seen[path]) return null;
     seen[path] = true;
-    const poster = firstAttr($link.find("img").first(), ["data-src", "data-original", "data-lazy-src", "src"]);
-    const title = cleanText(
-      $link.find(".title").first().text()
-      || $link.find("h3").first().text()
-      || $link.find("h2").first().text()
-      || $link.find("img").first().attr("alt")
-      || $link.text()
-      || id.toUpperCase()
-    );
-    if (!title && !poster) return;
-    const durationText = cleanText($link.find(".duration").first().text() || extractDurationText($link.text()));
-    items.push({
-      id,
-      type: "url",
-      title: title || id.toUpperCase(),
-      posterPath: absoluteUrl(poster, baseUrl),
-      durationText,
-      link: `detail:${absoluteUrl(path, baseUrl)}`,
-      playerType: "system",
-    });
-  });
-  return items;
+    return { id: path, title };
+  }).get().filter(Boolean);
 }
 
-function parseDetail(html, detailPath, baseUrl) {
-  const $ = Widget.html.load(html);
-  const ld = readJsonLd($);
-  const id = extractVideoId(detailPath) || detailPath;
-  const title = cleanText(
-    ld.name
-    || $("h1").first().text()
-    || $("meta[property='og:title']").first().attr("content")
-    || id.toUpperCase()
-  );
-  const poster = absoluteUrl(firstValue(ld.thumbnailUrl) || $("video").first().attr("poster") || firstAttr($("img").first(), ["data-src", "src"]), baseUrl);
-  const videoUrl = absoluteUrl(
-    ld.contentUrl
-    || ld.embedUrl
-    || $("video source").first().attr("src")
-    || $("video").first().attr("src")
-    || $("[data-src]").first().attr("data-src")
-    || extractPlayableUrl(html),
-    baseUrl
-  );
-  const backdropPaths = uniqueStrings(
-    []
-      .concat(arrayValue(ld.thumbnailUrl))
-      .concat($("img").map((_, img) => absoluteUrl(firstAttr($(img), ["data-src", "data-original", "src"]), baseUrl)).get())
-  ).filter((url) => url && url !== poster);
-  if (poster && backdropPaths.indexOf(poster) < 0) backdropPaths.unshift(poster);
-
-  return {
-    id,
-    type: "url",
-    title,
-    posterPath: poster,
-    backdropPath: backdropPaths[0] || poster,
-    backdropPaths,
-    videoUrl,
-    previewUrl: videoUrl,
-    duration: durationToSeconds(ld.duration),
-    durationText: secondsToText(durationToSeconds(ld.duration)) || extractDurationText(html),
-    releaseDate: cleanText(ld.uploadDate || ld.datePublished),
-    description: cleanText(ld.description || $("meta[name='description']").first().attr("content") || $(".description").first().text()),
-    genreItems: parseTaxonomy($, "tags"),
-    peoples: parsePeople($),
-    relatedItems: parseVideoList(html, baseUrl).filter((item) => item.id !== id),
-    link: `detail:${detailPath.indexOf("http") === 0 ? detailPath : absoluteUrl(detailPath, baseUrl)}`,
-    playerType: "system",
-  };
-}
-
-function readJsonLd($) {
-  const blocks = $("script[type='application/ld+json']").map((_, script) => $(script).text()).get();
-  for (let i = 0; i < blocks.length; i += 1) {
-    const text = cleanText(blocks[i]);
-    if (!text) continue;
-    try {
-      const parsed = JSON.parse(text);
-      const list = Array.isArray(parsed) ? parsed : [parsed];
-      for (let j = 0; j < list.length; j += 1) {
-        const item = list[j];
-        if (item && (item["@type"] === "VideoObject" || item.contentUrl || item.embedUrl)) return item;
-      }
-    } catch (_) {}
-  }
-  return {};
-}
-
-function parseTaxonomy($, segment) {
-  const items = [];
+function parsePeople($, pageUrl) {
   const seen = {};
-  $(`a[href*='/${segment}/'], a[href*='${segment}/']`).each((_, element) => {
-    const $link = $(element);
-    const id = lastPathPart($link.attr("href"));
-    const title = cleanText($link.text());
-    if (!id || !title || seen[id]) return;
-    seen[id] = true;
-    items.push({ id, title });
-  });
-  return items;
+  return $("a[href*='/actors/']").map((_, anchor) => {
+    const $anchor = $(anchor);
+    const path = pathAndQuery(absoluteUrl($anchor.attr("href"), pageUrl));
+    const title = cleanText($anchor.text() || $anchor.attr("title"));
+    if (!path || !title || seen[path]) return null;
+    seen[path] = true;
+    return { id: path, title, role: "演员" };
+  }).get().filter(Boolean);
 }
 
-function parsePeople($) {
-  return parseTaxonomy($, "actors").map((item) => ({
-    id: item.id,
-    title: item.title,
-    role: "演员",
-  }));
+function extractVideoUrl(html) {
+  const decoded = decodeHtmlEntities(String(html || ""));
+  const patterns = [
+    /var\s+hlsUrl\s*=\s*["']([^"']+)["']/i,
+    /(?:hlsUrl|videoUrl|video_url|source|src|file)\s*[:=]\s*["']([^"']+\.(?:m3u8|mp4)[^"']*)["']/i,
+    /<source\b[^>]+src=["']([^"']+\.(?:m3u8|mp4)[^"']*)["']/i,
+    /https?:\\?\/\\?\/[^"'<>\\\s]+?\.(?:m3u8|mp4)[^"'<>\\\s]*/i,
+  ];
+  for (const pattern of patterns) {
+    const match = decoded.match(pattern);
+    if (match) return (match[1] || match[0]).replace(/\\\//g, "/");
+  }
+  return "";
 }
 
-function parseDetailLink(link) {
-  const value = String(link || "");
-  const raw = value.indexOf("detail:") === 0 ? value.slice("detail:".length) : value;
-  if (!raw) return "";
-  return raw.indexOf("http") === 0 ? raw : pathFromHref(raw);
+function appendQuery(url, key, value) {
+  const join = url.indexOf("?") >= 0 ? "&" : "?";
+  return `${url}${join}${encodeURIComponent(key)}=${encodeURIComponent(value)}`;
+}
+
+function absoluteUrl(value, baseUrl) {
+  const url = cleanText(value);
+  if (!url) return "";
+  if (/^https?:\/\//i.test(url)) return url;
+  if (url.indexOf("//") === 0) return `https:${url}`;
+  const base = normalizeBaseUrl(originFromUrl(baseUrl) || baseUrl || DEFAULT_BASE_URL);
+  return url.indexOf("/") === 0 ? `${base}${url}` : `${base}/${url}`;
+}
+
+function normalizeDetailLink(link, baseUrl) {
+  const value = cleanText(link);
+  if (!value) return "";
+  if (value.indexOf("detail:") === 0) return absoluteUrl(value.slice(7), baseUrl);
+  return absoluteUrl(value, baseUrl);
+}
+
+function isDetailLink(link) {
+  return /\/v\/[^/?#]+/i.test(String(link || ""));
+}
+
+function titleFromUrl(url) {
+  const clean = String(url || "").split("?")[0].replace(/\/+$/, "");
+  const part = clean.split("/").pop() || clean;
+  return decodeURIComponent(part).replace(/-/g, " ").toUpperCase();
+}
+
+function getBaseUrl(params = {}) {
+  return normalizeBaseUrl(params.baseUrl || DEFAULT_BASE_URL);
 }
 
 function normalizeBaseUrl(baseUrl) {
   return String(baseUrl || DEFAULT_BASE_URL).replace(/\/+$/, "");
 }
 
-function normalizeLanguagePath(languagePath) {
-  return cleanText(languagePath || DEFAULT_LANGUAGE_PATH).replace(/^\/+|\/+$/g, "") || DEFAULT_LANGUAGE_PATH;
+function originFromUrl(url) {
+  const match = String(url || "").match(/^(https?:\/\/[^/]+)/i);
+  return match ? match[1] : DEFAULT_BASE_URL;
 }
 
-function requestHeaders(referer) {
-  return {
-    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0 Safari/537.36",
+function pathAndQuery(url) {
+  return String(url || "").replace(/^https?:\/\/[^/]+/i, "");
+}
+
+function defaultHeaders(referer, params = {}) {
+  const headers = {
+    "User-Agent": defaultUserAgent(),
+    Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
     "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
     Referer: referer || DEFAULT_BASE_URL,
   };
+  if (params.cookie) headers.Cookie = params.cookie;
+  return headers;
 }
 
-function pathFromHref(href) {
-  const value = String(href || "").trim();
-  if (!value) return "";
-  const noHash = value.split("#")[0].split("?")[0];
-  const path = noHash.replace(/^https?:\/\/[^/]+/i, "");
-  return path.indexOf("/") === 0 ? path : `/${path}`;
+function defaultUserAgent() {
+  return "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36";
 }
 
-function originFromUrl(url) {
-  const match = String(url || "").match(/^(https?:\/\/[^/]+)/i);
-  return match ? match[1].replace(/\/+$/, "") : DEFAULT_BASE_URL;
+function isChallengeHtml(html) {
+  const text = String(html || "").toLowerCase();
+  return text.indexOf("cloudflare") >= 0 || text.indexOf("just a moment") >= 0 || text.indexOf("captcha") >= 0;
 }
 
-function extractVideoId(href) {
-  const parts = pathFromHref(href).split("/").filter(Boolean);
-  const index = parts.indexOf("v");
-  return index >= 0 && parts[index + 1] ? decodeURIComponent(parts[index + 1]).toLowerCase() : "";
+function cleanText(value) {
+  return String(value || "").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
 }
 
-function lastPathPart(href) {
-  const parts = pathFromHref(href).split("/").filter(Boolean);
-  return parts.length ? decodeURIComponent(parts[parts.length - 1]) : "";
-}
-
-function absoluteUrl(value, baseUrl) {
-  const url = String(value || "").trim();
-  if (!url) return "";
-  if (/^https?:\/\//i.test(url)) return url;
-  if (url.indexOf("//") === 0) return `https:${url}`;
-  const base = normalizeBaseUrl(baseUrl);
-  return url.indexOf("/") === 0 ? `${base}${url}` : `${base}/${url}`;
-}
-
-function firstAttr($node, names) {
-  for (let i = 0; i < names.length; i += 1) {
-    const value = $node.attr(names[i]);
-    if (value) return value;
-  }
-  return "";
-}
-
-function firstValue(value) {
-  return Array.isArray(value) ? value[0] : value;
-}
-
-function arrayValue(value) {
-  if (!value) return [];
-  return Array.isArray(value) ? value : [value];
+function decodeHtmlEntities(value) {
+  return String(value || "")
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, "\"")
+    .replace(/&#39;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">");
 }
 
 function uniqueStrings(values) {
   const seen = {};
   const out = [];
-  for (let i = 0; i < values.length; i += 1) {
-    const value = cleanText(values[i]);
+  for (const raw of values) {
+    const value = cleanText(raw);
     if (!value || seen[value]) continue;
     seen[value] = true;
     out.push(value);
@@ -412,50 +489,13 @@ function uniqueStrings(values) {
   return out;
 }
 
-function cleanText(value) {
-  return String(value || "").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
-}
-
-function positiveInt(value, fallback) {
-  const number = parseInt(value, 10);
-  return Number.isFinite(number) && number > 0 ? number : fallback;
-}
-
-function extractDurationText(text) {
-  const match = String(text || "").match(/\b\d{1,2}:\d{2}(?::\d{2})?\b/);
-  return match ? match[0] : "";
-}
-
-function durationToSeconds(value) {
-  const text = String(value || "");
-  if (!text) return 0;
-  const iso = text.match(/P(?:T)?(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/i);
-  if (iso) return positiveInt(iso[1], 0) * 3600 + positiveInt(iso[2], 0) * 60 + positiveInt(iso[3], 0);
-  const parts = text.split(":").map((part) => parseInt(part, 10)).filter((part) => Number.isFinite(part));
-  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
-  if (parts.length === 2) return parts[0] * 60 + parts[1];
-  return 0;
-}
-
-function secondsToText(seconds) {
-  if (!seconds) return "";
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = seconds % 60;
-  const pad = (n) => (n < 10 ? `0${n}` : String(n));
-  return h ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`;
-}
-
-function extractPlayableUrl(html) {
-  const text = String(html || "");
-  const patterns = [
-    /https?:\/\/[^"'\\\s]+\.m3u8[^"'\\\s]*/i,
-    /https?:\/\/[^"'\\\s]+\.mp4[^"'\\\s]*/i,
-    /["'](?:file|url|src)["']\s*:\s*["']([^"']+)["']/i,
-  ];
-  for (let i = 0; i < patterns.length; i += 1) {
-    const match = text.match(patterns[i]);
-    if (match) return match[1] || match[0];
-  }
-  return "";
+function compactObject(object) {
+  const out = {};
+  Object.keys(object || {}).forEach((key) => {
+    const value = object[key];
+    if (value === undefined || value === null || value === "") return;
+    if (Array.isArray(value) && value.length === 0) return;
+    out[key] = value;
+  });
+  return out;
 }
