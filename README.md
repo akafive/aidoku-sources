@@ -8,7 +8,7 @@
 |---|---|---|
 | [123av](./123av) | https://123av.com/zh/dm9 | v1.1.0 按 Jable 写法重写 |
 | [archivebate](./archivebate) | https://archivebate.pro | v1.2.1 修复无声播放 |
-| [jable](./jable) | https://jable.tv | v1.3.0 规范化字段 |
+| [jable](./jable) | https://jable.tv | v2.3.6 更新主脚本 |
 | [supjav](./supjav) | https://supjav.com | v1.1.1 支持验证 Cookie |
 
 ## 通过 jsdelivr 加速访问
