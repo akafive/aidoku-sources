@@ -8,6 +8,7 @@
 |---|---|---|
 | [archivebate](./archivebate) | https://archivebate.pro | v1.2.1 修复无声播放 |
 | [jable](./jable) | https://jable.tv | v2.3.6 更新主脚本 |
+| [supjav](./supjav) | https://supjav.com | FC2PPV 列表、翻页、搜索和相关推荐 |
 
 ## 通过 jsdelivr 加速访问
 
@@ -22,6 +23,7 @@ https://cdn.jsdelivr.net/gh/akafive/nano-scripts@main/<path>
 ```
 https://cdn.jsdelivr.net/gh/akafive/nano-scripts@main/archivebate/Archivebate-v1.2.1.js
 https://cdn.jsdelivr.net/gh/akafive/nano-scripts@main/jable/Jable.js
+https://cdn.jsdelivr.net/gh/akafive/nano-scripts@main/supjav/SupJav-FC2PPV.js
 ```
 
 ### 强制刷新 jsdelivr 缓存
