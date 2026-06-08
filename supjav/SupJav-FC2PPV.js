@@ -1,223 +1,183 @@
 WidgetMetadata = {
-  id: "forward.supjav.fc2ppv",
+  id: "supjav_fc2ppv",
   title: "SupJav FC2PPV",
-  version: "1.0.0",
-  requiredVersion: "0.0.1",
-  description: "抓取 SupJav 中文站 fc2ppv 标签列表，支持翻页、搜索和相关推荐。",
+  description: "SupJav 中文站 FC2PPV 标签页，支持翻页、搜索和相关推荐。",
   author: "akafive",
   site: "https://supjav.com/zh/tag/fc2ppv",
-  detailCacheDuration: 3600,
-  globalParams: [
-    {
-      name: "cookie",
-      title: "Cookie（可选）",
-      type: "input",
-      description: "浏览器通过 SupJav 验证后复制 Cookie，常见包含 cf_clearance",
-      value: "",
-    },
-  ],
+  version: "1.0.1",
+  requiredVersion: "0.0.2",
+  detailCacheDuration: 60,
   modules: [
     {
-      id: "loadList",
-      title: "FC2PPV",
-      functionName: "loadList",
-      cacheDuration: 3600,
+      title: "搜索",
+      description: "搜索 SupJav",
       requiresWebView: true,
+      functionName: "search",
+      cacheDuration: 3600,
       params: [
         {
-          name: "page",
-          title: "页码",
-          type: "page",
+          name: "keyword",
+          title: "关键词",
+          type: "input",
+          description: "番号或关键词",
+          placeholders: [
+            { title: "FC2PPV", value: "fc2ppv" },
+            { title: "番号", value: "FC2PPV-" },
+          ],
         },
+        cookieParam(),
+        { name: "from", title: "页码", type: "page", description: "页码", value: "1" },
+      ],
+    },
+    {
+      title: "FC2PPV",
+      description: "SupJav FC2PPV 标签列表",
+      requiresWebView: true,
+      functionName: "loadPage",
+      cacheDuration: 3600,
+      params: [
+        {
+          name: "url",
+          title: "列表地址",
+          type: "constant",
+          description: "列表地址",
+          value: "https://supjav.com/zh/tag/fc2ppv",
+        },
+        cookieParam(),
+        { name: "from", title: "页码", type: "page", description: "页码", value: "1" },
       ],
     },
   ],
-  search: {
-    title: "搜索",
-    functionName: "search",
-    params: [
-      {
-        name: "keyword",
-        title: "关键词",
-        type: "input",
-        placeholders: [
-          { title: "FC2PPV", value: "fc2ppv" },
-          { title: "番号", value: "FC2PPV-" },
-        ],
-      },
-      {
-        name: "page",
-        title: "页码",
-        type: "page",
-      },
-    ],
-  },
 };
 
-var SUPJAV_BASE_URL = "https://supjav.com";
-var SUPJAV_ZH_URL = SUPJAV_BASE_URL + "/zh";
-var SUPJAV_TAG_URL = SUPJAV_ZH_URL + "/tag/fc2ppv";
-var SUPJAV_HEADERS = {
-  "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0 Safari/537.36",
-  Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-  "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
-  Referer: SUPJAV_ZH_URL + "/",
+const SUPJAV_BASE = "https://supjav.com";
+const SUPJAV_HOME = "https://supjav.com/zh/";
+const FC2PPV_URL = "https://supjav.com/zh/tag/fc2ppv";
+const COOKIE_STORAGE_KEY = "supjav.fc2ppv.cookie";
+const DEFAULT_HEADERS = {
+  "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+  Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+  "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8,ja;q=0.7",
 };
-var COOKIE_STORAGE_KEY = "supjav.fc2ppv.cookie";
 
-async function loadList(params) {
-  var page = normalizePage(params && params.page);
-  var genreUrl = normalizeUrl(params && params.genreId);
-  var url = genreUrl || buildListUrl(page);
-  var cookie = rememberCookie(params && params.cookie);
-  return fetchList(url, cookie);
+function cookieParam() {
+  return {
+    name: "cookie",
+    title: "Cookie（可选）",
+    type: "input",
+    description: "浏览器通过 SupJav 验证后复制 Cookie，常见包含 cf_clearance",
+    value: "",
+  };
 }
 
-async function search(params) {
-  var keyword = params && params.keyword ? String(params.keyword).trim() : "";
-  if (!keyword) {
-    return [];
-  }
+async function search(params = {}) {
+  const keyword = String(params.keyword || "").trim();
+  if (!keyword) return [];
 
-  var page = normalizePage(params && params.page);
-  var cookie = rememberCookie(params && params.cookie);
-  return fetchList(buildSearchUrl(keyword, page), cookie);
+  const cookie = rememberCookie(params.cookie);
+  const htmlContent = await requestHtml(buildSearchUrl(encodeURIComponent(keyword), params.from), SUPJAV_HOME, cookie);
+  return parseListHtml(htmlContent);
+}
+
+async function loadPage(params = {}) {
+  const cookie = rememberCookie(params.cookie);
+  const targetUrl = params.genreId || params.peopleId || params.url || FC2PPV_URL;
+  const htmlContent = await requestHtml(buildListUrl(targetUrl, params.from), SUPJAV_HOME, cookie);
+  return parseListHtml(htmlContent);
 }
 
 async function loadDetail(link) {
-  var url = normalizeUrl(link);
-  if (!url) {
-    return null;
+  if (!link) {
+    throw new Error("详情页地址不能为空");
   }
 
-  try {
-    var html = await fetchHtml(url, getStoredCookie());
-    var $ = Widget.html.load(html);
-    var title = cleanText(
-      $("h1.entry-title").first().text() ||
-        $("article h1").first().text() ||
-        $("h1").first().text() ||
-        $("title").first().text()
-    );
-    var content = $(".entry-content").first();
-    if (!content.length) {
-      content = $(".post-content").first();
-    }
-    if (!content.length) {
-      content = $("article").first();
-    }
+  const pageUrl = absoluteUrl(link, SUPJAV_BASE);
+  const cookie = getStoredCookie();
+  const htmlContent = await requestHtml(pageUrl, SUPJAV_HOME, cookie);
+  const $ = Widget.html.load(htmlContent);
 
-    var images = collectDetailImages($, content);
-    var poster = images[0] || "";
-    var description = cleanText(
-      content
-        .find("p")
-        .filter(function () {
-          return !$(this).find("img, iframe, video, script, style").length;
-        })
-        .first()
-        .text()
-    );
-    if (!description) {
-      description = cleanText(
-        $('meta[name="description"]').attr("content") ||
-          $('meta[property="og:description"]').attr("content") ||
-          ""
-      );
-    }
+  const title = cleanText(
+    $('meta[property="og:title"]').attr("content") ||
+      $('meta[name="og:title"]').attr("content") ||
+      $("h1.entry-title, h1, .entry-title").first().text()
+  );
+  const cover = absoluteUrl(
+    $('meta[property="og:image"]').attr("content") ||
+      $('meta[name="og:image"]').attr("content") ||
+      $(".post-meta img, .post-content img, article img, img").first().attr("src"),
+    pageUrl
+  );
+  const description = cleanText(
+    $(".post-content p")
+      .filter(function () {
+        return !$(this).find("img, iframe, video, script, style").length;
+      })
+      .first()
+      .text() ||
+      $('meta[property="og:description"]').attr("content") ||
+      $('meta[name="description"]').attr("content")
+  );
 
-    return {
-      id: url,
-      type: "url",
-      mediaType: "movie",
-      title: title || url,
-      posterPath: poster,
-      backdropPath: poster,
-      coverUrl: poster,
-      description: description,
-      backdropPaths: images,
-      genreItems: parseGenres($),
-      relatedItems: parseRelatedItems($, url),
-      link: url,
-    };
-  } catch (error) {
-    console.error("SupJav loadDetail failed:", error.message || error);
-    return null;
-  }
-}
+  const iframeUrl = pickPlayerIframeUrl($, htmlContent, pageUrl);
+  let videoUrl = absoluteUrl(extractVideoUrl(htmlContent), pageUrl);
+  let referer = pageUrl;
 
-async function fetchList(url, cookie) {
-  try {
-    var html = await fetchHtml(url, cookie);
-    var $ = Widget.html.load(html);
-    return parseListItems($);
-  } catch (error) {
-    console.error("SupJav fetchList failed:", error.message || error);
-    return [];
-  }
-}
-
-async function fetchHtml(url, cookie) {
-  var headers = {};
-  for (var key in SUPJAV_HEADERS) {
-    headers[key] = SUPJAV_HEADERS[key];
-  }
-  if (cookie) {
-    headers.Cookie = cookie;
+  if (!videoUrl && iframeUrl) {
+    const iframeHtml = await requestHtml(iframeUrl, pageUrl, cookie);
+    videoUrl = absoluteUrl(extractVideoUrl(iframeHtml), iframeUrl);
+    referer = iframeUrl;
   }
 
-  var response = await Widget.http.get(url, {
-    headers: headers,
+  const stills = collectDetailImages($, pageUrl);
+  if (!stills.length && cover) stills.push(cover);
+
+  return cleanObject({
+    id: pageUrl,
+    type: "url",
+    title: title || pageUrl,
+    videoUrl,
+    posterPath: cover || stills[0],
+    backdropPath: cover || stills[0],
+    backdropPaths: stills,
+    description,
+    genreItems: parseGenres($),
+    relatedItems: parseRelatedItems($, pageUrl),
+    mediaType: "movie",
+    playerType: "system",
+    link: pageUrl,
+    customHeaders: videoUrl ? {
+      "User-Agent": DEFAULT_HEADERS["User-Agent"],
+      Referer: referer,
+      Origin: originOf(referer),
+    } : undefined,
   });
-  var html = response && response.data ? response.data : "";
-  if (isChallengeHtml(html)) {
-    throw new Error("站点返回验证页，无法解析。请先在浏览器打开 supjav.com 通过验证，再把 Cookie 填到模块参数里；通常会包含 cf_clearance。");
-  }
-  return html;
 }
 
-function buildListUrl(page) {
-  if (page <= 1) {
-    return SUPJAV_TAG_URL;
+async function requestHtml(url, referer, cookie) {
+  const headers = {
+    ...DEFAULT_HEADERS,
+    Referer: referer || SUPJAV_HOME,
+  };
+  if (cookie) headers.Cookie = cookie;
+
+  const response = await Widget.http.get(url, { headers });
+  if (!response || !response.data || typeof response.data !== "string") {
+    throw new Error("无法获取有效的HTML内容");
   }
-  return SUPJAV_TAG_URL + "/page/" + page + "/";
+  if (isChallengeHtml(response.data)) {
+    throw new Error("站点返回验证页，无法解析。请先在浏览器打开 supjav.com 通过验证，再把 Cookie 填到模块参数里；如果 Cookie 仍失效，说明站点验证无法由 Widget.http 复用。");
+  }
+  return response.data;
 }
 
-function buildSearchUrl(keyword, page) {
-  var url = SUPJAV_ZH_URL + "/?s=" + encodeURIComponent(keyword);
-  if (page > 1) {
-    url += "&paged=" + page;
-  }
-  return url;
-}
+function parseListHtml(htmlContent) {
+  const $ = Widget.html.load(htmlContent);
+  const items = [];
+  const seen = {};
 
-function parseListItems($) {
-  var items = [];
-  var seen = {};
-  var candidates = $("article, .post, .post-item, .loop-item, .item, .video, .video-item");
-
-  candidates.each(function () {
-    var item = parseCard($, $(this));
-    if (!item || seen[item.link]) {
-      return;
-    }
-    seen[item.link] = true;
-    items.push(item);
-  });
-
-  if (items.length) {
-    return items;
-  }
-
-  $("a[href]").each(function () {
-    var card = $(this);
-    if (!card.find("img").length) {
-      return;
-    }
-    var item = parseCard($, card);
-    if (!item || seen[item.link]) {
-      return;
-    }
+  $(".posts.clearfix > .post, .posts > .post").each((_, element) => {
+    const item = parsePostCard($, $(element));
+    if (!item || seen[item.link]) return;
     seen[item.link] = true;
     items.push(item);
   });
@@ -226,223 +186,123 @@ function parseListItems($) {
 }
 
 function parseRelatedItems($, currentUrl) {
-  var items = [];
-  var seen = {};
-  var containers = $(".related, .related-posts, #related, .yarpp-related, .post-related, .recommended, .recommend, .posts");
+  const items = [];
+  const seen = {};
+  seen[currentUrl] = true;
 
-  containers.each(function () {
-    parseListItemsFromContainer($, $(this), items, seen, currentUrl);
+  $(".posts.clearfix > .post, .posts > .post").each((_, element) => {
+    const item = parsePostCard($, $(element));
+    if (!item || seen[item.link]) return;
+    seen[item.link] = true;
+    items.push(item);
   });
-
-  if (!items.length) {
-    $("h2, h3, h4").each(function () {
-      var heading = cleanText($(this).text()).toLowerCase();
-      if (heading.indexOf("related") === -1 && heading.indexOf("推荐") === -1 && heading.indexOf("相关") === -1) {
-        return;
-      }
-      parseListItemsFromContainer($, $(this).parent(), items, seen, currentUrl);
-    });
-  }
 
   return items;
 }
 
-function parseListItemsFromContainer($, container, items, seen, currentUrl) {
-  container.find("article, .post, .post-item, .loop-item, .item, .video, .video-item").each(function () {
-    var item = parseCard($, $(this));
-    appendRelatedItem(item, items, seen, currentUrl);
-  });
+function parsePostCard($, element) {
+  const $item = element;
+  const titleElement = $item.find("h3 > a[rel='bookmark'][itemprop='url'], h3 a[rel='bookmark'], h3 a").first();
+  const coverElement = $item.find("a.img[title], a.img").first();
+  const imageElement = coverElement.find("img").first().length ? coverElement.find("img").first() : $item.find("img").first();
+  const link = absoluteUrl(titleElement.attr("href") || coverElement.attr("href"), SUPJAV_BASE);
 
-  if (items.length) {
-    return;
-  }
+  if (!isSupjavVideoUrl(link)) return null;
 
-  container.find("a[href]").each(function () {
-    var link = $(this);
-    if (!link.find("img").length) {
-      return;
-    }
-    var item = parseCard($, link);
-    appendRelatedItem(item, items, seen, currentUrl);
-  });
-}
+  const title = cleanText(titleElement.text() || coverElement.attr("title") || imageElement.attr("alt"));
+  if (!title) return null;
 
-function appendRelatedItem(item, items, seen, currentUrl) {
-  if (!item || item.link === currentUrl || seen[item.link]) {
-    return;
-  }
-  seen[item.link] = true;
-  items.push(item);
-}
-
-function parseCard($, card) {
-  var linkNode = pickLink($, card);
-  var link = normalizeUrl(linkNode.attr("href"));
-  if (!link || !isSupjavPostUrl(link)) {
-    return null;
-  }
-
-  var imageNode = card.find("img").first();
-  var image = normalizeUrl(
-    imageNode.attr("data-src") ||
-      imageNode.attr("data-original") ||
-      imageNode.attr("data-lazy-src") ||
-      imageNode.attr("src") ||
-      ""
+  const cover = absoluteUrl(
+    imageElement.attr("data-original") ||
+      imageElement.attr("data-src") ||
+      imageElement.attr("data-lazy-src") ||
+      imageElement.attr("src"),
+    link
   );
-  var title = cleanText(
-    card.find(".entry-title a, .post-title a, h1 a, h2 a, h3 a").first().text() ||
-      linkNode.attr("title") ||
-      imageNode.attr("alt") ||
-      linkNode.text()
+  const releaseDate = cleanText(
+    $item.find(".date, time, .post-date").first().attr("datetime") ||
+      $item.find(".date, time, .post-date").first().text()
   );
-  var description = cleanElementText($, card.find(".entry-meta, .post-meta, .meta, time").first());
 
-  if (!title) {
-    return null;
-  }
-
-  return {
+  return cleanObject({
     id: link,
     type: "url",
+    title,
+    posterPath: cover,
+    backdropPath: cover,
+    link,
     mediaType: "movie",
-    title: title,
-    posterPath: image,
-    backdropPath: image,
-    coverUrl: image,
-    description: description,
-    link: link,
-  };
-}
-
-function pickLink($, card) {
-  var titleLink = card.find(".entry-title a[href], .post-title a[href], h1 a[href], h2 a[href], h3 a[href]").first();
-  if (titleLink.length) {
-    return titleLink;
-  }
-
-  var imageLink = card.find("a[href]").filter(function () {
-    return $(this).find("img").length > 0;
-  }).first();
-  if (imageLink.length) {
-    return imageLink;
-  }
-
-  if (card.is("a[href]")) {
-    return card;
-  }
-
-  return card.find("a[href]").first();
+    releaseDate,
+    playerType: "system",
+  });
 }
 
 function parseGenres($) {
-  var genres = [];
-  var seen = {};
+  const genres = [];
+  const seen = {};
 
-  $('a[rel="tag"], .tags a, .tagcloud a, a[href*="/tag/"]').each(function () {
-    var title = cleanText($(this).text());
-    var href = normalizeUrl($(this).attr("href"));
-    if (!title || !href || seen[href]) {
-      return;
-    }
+  $('a[rel="tag"], .tags a, a[href*="/tag/"]').each((_, element) => {
+    const $a = $(element);
+    const title = cleanText($a.text());
+    const href = absoluteUrl($a.attr("href"), SUPJAV_BASE);
+    if (!title || !href || seen[href]) return;
     seen[href] = true;
-    genres.push({
-      id: href,
-      title: title,
-    });
+    genres.push({ id: href, title });
   });
 
   return genres;
 }
 
-function collectImages($, container) {
-  var images = [];
-  var seen = {};
+function collectDetailImages($, pageUrl) {
+  const images = [];
+  const seen = {};
 
-  collectBackgroundImages($, container, images, seen);
-
-  container.find("img").each(function () {
-    var image = normalizeUrl(
-      $(this).attr("data-src") ||
-        $(this).attr("data-original") ||
-        $(this).attr("data-lazy-src") ||
-        $(this).attr("src") ||
-        ""
-    );
-    if (!image || seen[image] || isIgnoredImage(image)) {
-      return;
-    }
-    seen[image] = true;
-    images.push(image);
-  });
+  collectBackgroundImages($, $("#player-wrap, .player-wrap"), images, seen, pageUrl);
+  collectImagesInto($, $(".post-meta, .post-content"), images, seen, pageUrl);
 
   return images;
 }
 
-function collectDetailImages($, content) {
-  var images = [];
-  var seen = {};
-
-  collectBackgroundImages($, $("#player-wrap, .player-wrap"), images, seen);
-  collectImagesInto($, $(".post-meta, .post-content, .entry-content"), images, seen);
-  if (!images.length && content && content.length) {
-    collectImagesInto($, content, images, seen);
-  }
-
-  return images;
-}
-
-function collectImagesInto($, container, images, seen) {
-  collectBackgroundImages($, container, images, seen);
-  container.find("img").each(function () {
-    var image = normalizeUrl(
-      $(this).attr("data-src") ||
-        $(this).attr("data-original") ||
-        $(this).attr("data-lazy-src") ||
-        $(this).attr("src") ||
-        ""
+function collectImagesInto($, container, images, seen, pageUrl) {
+  container.find("img").each((_, element) => {
+    const $img = $(element);
+    appendImage(
+      absoluteUrl(
+        $img.attr("data-original") ||
+          $img.attr("data-src") ||
+          $img.attr("data-lazy-src") ||
+          $img.attr("src"),
+        pageUrl
+      ),
+      images,
+      seen
     );
-    if (!image || seen[image] || isIgnoredImage(image)) {
-      return;
-    }
-    seen[image] = true;
-    images.push(image);
   });
 }
 
-function collectBackgroundImages($, container, images, seen) {
-  container.each(function () {
-    appendStyleImage($(this).attr("style"), images, seen);
+function collectBackgroundImages($, container, images, seen, pageUrl) {
+  container.each((_, element) => {
+    appendStyleImage($(element).attr("style"), images, seen, pageUrl);
   });
-  container.find("[style]").each(function () {
-    appendStyleImage($(this).attr("style"), images, seen);
+  container.find("[style]").each((_, element) => {
+    appendStyleImage($(element).attr("style"), images, seen, pageUrl);
   });
 }
 
-function appendStyleImage(style, images, seen) {
-  var image = extractStyleImage(style);
-  if (!image || seen[image] || isIgnoredImage(image)) {
-    return;
-  }
-  seen[image] = true;
-  images.push(image);
+function appendStyleImage(style, images, seen, pageUrl) {
+  const match = String(style || "").match(/url\((['"]?)(.*?)\1\)/i);
+  if (!match) return;
+  appendImage(absoluteUrl(match[2], pageUrl), images, seen);
 }
 
-function extractStyleImage(style) {
-  var match = String(style || "").match(/url\((['"]?)(.*?)\1\)/i);
-  return match ? normalizeUrl(match[2]) : "";
-}
-
-function normalizePage(page) {
-  var value = Number(page || 1);
-  if (!isFinite(value) || value < 1) {
-    return 1;
-  }
-  return Math.floor(value);
+function appendImage(url, images, seen) {
+  if (!url || seen[url] || isIgnoredImage(url)) return;
+  seen[url] = true;
+  images.push(url);
 }
 
 function rememberCookie(raw) {
-  var cookie = normalizeCookie(raw);
+  const cookie = normalizeCookie(raw);
   if (cookie && Widget.storage && Widget.storage.set) {
     Widget.storage.set(COOKIE_STORAGE_KEY, cookie);
   }
@@ -450,86 +310,168 @@ function rememberCookie(raw) {
 }
 
 function getStoredCookie() {
-  if (!Widget.storage || !Widget.storage.get) {
-    return "";
-  }
+  if (!Widget.storage || !Widget.storage.get) return "";
   return normalizeCookie(Widget.storage.get(COOKIE_STORAGE_KEY));
 }
 
 function normalizeCookie(raw) {
-  if (!raw) {
-    return "";
-  }
-  return String(raw)
-    .trim()
-    .replace(/^cookie\s*:\s*/i, "")
-    .trim();
+  if (!raw) return "";
+  return String(raw).trim().replace(/^cookie\s*:\s*/i, "").trim();
 }
 
-function normalizeUrl(url) {
-  if (!url) {
-    return "";
+function buildSearchUrl(encodedKeyword, from) {
+  const page = Number(from || 1);
+  if (page > 1) {
+    return `${SUPJAV_HOME}page/${page}/?s=${encodedKeyword}`;
   }
-  var value = String(url).trim();
-  if (!value || value.indexOf("data:") === 0 || value.indexOf("javascript:") === 0) {
-    return "";
-  }
-  if (value.indexOf("//") === 0) {
-    return "https:" + value;
-  }
-  if (value.indexOf("/") === 0) {
-    return SUPJAV_BASE_URL + value;
-  }
-  return value;
+  return `${SUPJAV_HOME}?s=${encodedKeyword}`;
 }
 
-function cleanText(text) {
-  return String(text || "")
-    .replace(/\s+/g, " ")
-    .replace(/\u00a0/g, " ")
-    .trim();
+function buildListUrl(url, from) {
+  const page = Number(from || 1);
+  const absolute = absoluteUrl(url || FC2PPV_URL, SUPJAV_HOME);
+  if (!page || page <= 1) return absolute;
+  if (absolute.includes("?")) {
+    return `${absolute}&paged=${page}`;
+  }
+  return `${absolute.replace(/\/+$/, "")}/page/${page}/`;
 }
 
-function cleanElementText($, element) {
-  if (!element || !element.length) {
-    return "";
+function extractVideoUrl(htmlContent) {
+  const decoded = decodeHtmlEntities(String(htmlContent || ""));
+  const patterns = [
+    /<source\b[^>]+src=["']([^"']+\.(?:mp4|m3u8)[^"']*)["']/i,
+    /(?:videoUrl|video_url|hlsUrl|source|src|file)\s*[:=]\s*["']([^"']+\.(?:mp4|m3u8)[^"']*)["']/i,
+    /https?:\\?\/\\?\/[^"'<>\\\s]+?\.(?:mp4|m3u8)[^"'<>\\\s]*/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = decoded.match(pattern);
+    if (match) return (match[1] || match[0]).replace(/\\\//g, "/");
   }
-  var clone = element.clone();
-  clone.find("*").each(function () {
-    $(this).before(" ");
-    $(this).after(" ");
+  return "";
+}
+
+function extractIframeUrl(htmlContent) {
+  const match = String(htmlContent || "").match(/<iframe\b[^>]+src=["']([^"']+)["']/i);
+  return match ? match[1] : "";
+}
+
+function pickPlayerIframeUrl($, htmlContent, pageUrl) {
+  const candidates = [];
+  $("iframe[src]").each((_, element) => {
+    candidates.push($(element).attr("src"));
   });
-  return cleanText(clone.text());
+  candidates.push(extractIframeUrl(htmlContent));
+
+  for (const candidate of candidates) {
+    const iframeUrl = absoluteUrl(candidate, pageUrl);
+    if (isPlayerIframeUrl(iframeUrl)) return iframeUrl;
+  }
+
+  return "";
 }
 
-function isSupjavPostUrl(url) {
-  if (url.indexOf(SUPJAV_BASE_URL) !== 0) {
+function isPlayerIframeUrl(url) {
+  if (!url || /^javascript:/i.test(url)) return false;
+  const lowered = String(url).toLowerCase();
+  if (
+    lowered.includes("/ad?") ||
+    lowered.includes("smartpop") ||
+    lowered.includes("spotid=") ||
+    lowered.includes("mnaspm.com") ||
+    lowered.includes("eix304.com") ||
+    lowered.includes("doubleclick") ||
+    lowered.includes("googlesyndication") ||
+    lowered.includes("adsterra") ||
+    lowered.includes("popads")
+  ) {
     return false;
   }
-  if (url.indexOf("/tag/") !== -1 || url.indexOf("/category/") !== -1 || url.indexOf("/page/") !== -1) {
-    return false;
+  return (
+    lowered.includes("embed") ||
+    lowered.includes("player") ||
+    lowered.includes("stream") ||
+    lowered.includes("m3u8") ||
+    lowered.includes("mp4") ||
+    lowered.includes("supjav.com")
+  );
+}
+
+function isSupjavVideoUrl(url) {
+  if (!url) return false;
+  const absolute = absoluteUrl(url, SUPJAV_BASE);
+  if (!/^https?:\/\/(?:www\.)?supjav\.com(?:\/|$)/i.test(absolute)) return false;
+  const path = pathOf(absolute);
+  if (!/^\/zh\/[^/?#]+\/?$/i.test(path)) return false;
+  return !/^\/zh\/(?:page|category|tag|actor|actress|maker|series|genre|author)\//i.test(path);
+}
+
+function absoluteUrl(value, base) {
+  if (!value) return "";
+  const cleaned = String(value).trim().replace(/\\\//g, "/");
+  if (/^https?:\/\//i.test(cleaned)) return cleaned;
+  if (/^\/\//.test(cleaned)) return `https:${cleaned}`;
+  const origin = originOf(base || SUPJAV_BASE);
+  if (cleaned.charAt(0) === "/") return `${origin}${cleaned}`;
+  const baseNoQuery = String(base || SUPJAV_HOME).split("#")[0].split("?")[0];
+  const dir = /\/$/.test(baseNoQuery) ? baseNoQuery : baseNoQuery.replace(/\/[^/]*$/, "/");
+  return `${dir}${cleaned}`;
+}
+
+function originOf(url) {
+  const match = String(url || "").match(/^(https?:\/\/[^/]+)/i);
+  return match ? match[1] : SUPJAV_BASE;
+}
+
+function pathOf(url) {
+  return String(url || "")
+    .replace(/^https?:\/\/[^/]+/i, "")
+    .split("#")[0]
+    .split("?")[0] || "/";
+}
+
+function cleanObject(object) {
+  const result = {};
+  for (const key in object) {
+    const value = object[key];
+    if (value === "" || value === undefined || value === null) continue;
+    if (Array.isArray(value) && value.length === 0) continue;
+    result[key] = value;
   }
-  return true;
+  return result;
+}
+
+function isChallengeHtml(htmlContent) {
+  const text = String(htmlContent || "");
+  return /cf-mitigated["']?\s*[:=]\s*["']?challenge/i.test(text) ||
+    /Just a moment\.\.\./i.test(text) ||
+    /Enable JavaScript and cookies to continue/i.test(text) ||
+    /cdn-cgi\/challenge-platform/i.test(text) ||
+    /checking your browser/i.test(text);
 }
 
 function isIgnoredImage(url) {
-  var lowered = String(url).toLowerCase();
-  return (
-    lowered.indexOf("logo") !== -1 ||
-    lowered.indexOf("avatar") !== -1 ||
-    lowered.indexOf("icon") !== -1 ||
-    lowered.indexOf("ads") !== -1 ||
-    lowered.indexOf("banner") !== -1
-  );
+  const lowered = String(url || "").toLowerCase();
+  return lowered.includes("logo") ||
+    lowered.includes("avatar") ||
+    lowered.includes("icon") ||
+    lowered.includes("ads") ||
+    lowered.includes("banner");
 }
 
-function isChallengeHtml(html) {
-  var text = String(html || "").toLowerCase();
-  return (
-    text.indexOf("cf-mitigated") !== -1 ||
-    text.indexOf("challenge-platform") !== -1 ||
-    text.indexOf("cloudflare") !== -1 && text.indexOf("cf-browser-verification") !== -1 ||
-    text.indexOf("checking your browser") !== -1 ||
-    text.indexOf("just a moment") !== -1
-  );
+function cleanText(value) {
+  return decodeHtmlEntities(String(value || ""))
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function decodeHtmlEntities(value) {
+  return String(value || "")
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&#x2F;/g, "/");
 }
