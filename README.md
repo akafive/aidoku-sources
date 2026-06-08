@@ -7,7 +7,7 @@
 | 子目录 | 站点 | 备注 |
 |---|---|---|
 | [archivebate](./archivebate) | https://archivebate.pro | v1.2.1 修复无声播放 |
-| [jable](./jable) | https://jable.tv | v2.3.6 更新主脚本 |
+| [jable](./jable) | https://jable.tv | v1.3.0 规范化字段 |
 
 ## 通过 jsdelivr 加速访问
 
