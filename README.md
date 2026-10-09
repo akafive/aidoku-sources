@@ -1,42 +1,21 @@
-# nano-scripts
+# Aidoku Sources
 
-一些自用的小脚本集合。
+个人 Aidoku Rust/WASM 漫画源集合。
 
-## 列表
+## 导入
 
-| 子目录 | 站点 | 备注 |
+在 Aidoku 的设置 → Source Lists 中添加：
+
+```
+https://raw.githubusercontent.com/akafive/aidoku-sources/main/aidoku/dist/index.min.json
+```
+
+也可以直接打开 [Manga18 `.aix` 安装包](./aidoku/dist/sources/en.manga18-v1.aix)。
+
+## 源
+
+| 源 | 站点 | 说明 |
 |---|---|---|
-| [archivebate](./archivebate) | https://archivebate.pro | v1.2.1 修复无声播放 |
-| [jable](./jable) | https://jable.tv | v1.3.0 规范化字段 |
-| [aidoku/en.manga18](./aidoku/en.manga18) | https://manga18fx.com / https://manga18.club | Aidoku Rust/WASM 漫画源 |
+| [Manga18](./aidoku/en.manga18) | https://manga18fx.com / https://manga18.club | 搜索、分类、章节和图片 |
 
-## 通过 jsdelivr 加速访问
-
-国内/移动端通过 jsdelivr CDN 可以直接拉到 raw 文件，无需访问 GitHub：
-
-```
-https://cdn.jsdelivr.net/gh/akafive/nano-scripts@main/<path>
-```
-
-例如：
-
-```
-https://cdn.jsdelivr.net/gh/akafive/nano-scripts@main/archivebate/Archivebate-v1.2.1.js
-https://cdn.jsdelivr.net/gh/akafive/nano-scripts@main/jable/Jable.js
-```
-
-### 强制刷新 jsdelivr 缓存
-
-更新脚本后，jsdelivr 默认缓存 12 小时（边缘）+ 7 天（浏览器）。要立即生效：
-
-```
-https://purge.jsdelivr.net/gh/akafive/nano-scripts@main/<path>
-```
-
-在浏览器打开 purge URL 即可。
-
-## 目录约定
-
-- 每个子目录一个主题，自带 README 说明改动
-- 主脚本沿用上游命名（`<名称>-v<版本>.js`）
-- 调试 driver 命名 `debug-<名称>.mjs`
+`.aix` 包和 source list 由 GitHub Actions 自动生成并提交到 [`aidoku/dist`](./aidoku/dist)。

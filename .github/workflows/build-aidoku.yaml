@@ -56,7 +56,7 @@ jobs:
           rm -rf aidoku/dist
           aidoku build aidoku/en.manga18/package.aix \
             --output aidoku/dist \
-            --name "nano-scripts Aidoku Sources"
+            --name "Aidoku Sources"
           rm aidoku/en.manga18/package.aix
           test -s aidoku/dist/index.min.json
           test -s aidoku/dist/sources/en.manga18-v1.aix
