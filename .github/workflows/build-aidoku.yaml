@@ -1,0 +1,76 @@
+name: Build Aidoku source
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "aidoku/en.manga18/**"
+      - ".github/workflows/build-aidoku.yaml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust and WebAssembly target
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache Cargo dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            aidoku/en.manga18/target
+          key: ${{ runner.os }}-cargo-aidoku-${{ hashFiles('aidoku/en.manga18/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-aidoku-
+
+      - name: Install Aidoku CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          cli_root="$RUNNER_TEMP/aidoku-cli"
+          cargo install --git https://github.com/Aidoku/aidoku-rs --locked --root "$cli_root" aidoku-cli
+          echo "$cli_root/bin" >> "$GITHUB_PATH"
+
+      - name: Package source and build source list
+        shell: bash
+        run: |
+          set -euo pipefail
+          (
+            cd aidoku/en.manga18
+            aidoku package
+          )
+          aidoku verify aidoku/en.manga18/package.aix
+          rm -rf aidoku/dist
+          aidoku build aidoku/en.manga18/package.aix \
+            --output aidoku/dist \
+            --name "nano-scripts Aidoku Sources"
+          rm aidoku/en.manga18/package.aix
+          test -s aidoku/dist/index.min.json
+          test -s aidoku/dist/sources/en.manga18-v1.aix
+
+      - name: Publish generated package
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add aidoku/dist
+          if git diff --cached --quiet; then
+            echo "No generated changes to commit"
+            exit 0
+          fi
+          git commit -m "build: update Aidoku package"
+          git push
