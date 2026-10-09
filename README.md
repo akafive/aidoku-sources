@@ -8,6 +8,7 @@
 |---|---|---|
 | [archivebate](./archivebate) | https://archivebate.pro | v1.2.1 修复无声播放 |
 | [jable](./jable) | https://jable.tv | v1.3.0 规范化字段 |
+| [aidoku/en.manga18](./aidoku/en.manga18) | https://manga18fx.com / https://manga18.club | Aidoku Rust/WASM 漫画源 |
 
 ## 通过 jsdelivr 加速访问
 
