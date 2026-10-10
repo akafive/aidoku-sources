@@ -59,7 +59,7 @@ jobs:
             --name "Aidoku Sources"
           rm aidoku/en.manga18/package.aix
           test -s aidoku/dist/index.min.json
-          test -s aidoku/dist/sources/en.manga18-v1.aix
+          test -s aidoku/dist/sources/en.manga18-v2.aix
 
       - name: Publish generated package
         shell: bash

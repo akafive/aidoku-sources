@@ -3,10 +3,10 @@
   "sources": [
     {
       "id": "en.manga18",
-      "name": "Manga18",
-      "version": 1,
-      "iconURL": "icons/en.manga18-v1.png",
-      "downloadURL": "sources/en.manga18-v1.aix",
+      "name": "Manga18 Club",
+      "version": 2,
+      "iconURL": "icons/en.manga18-v2.png",
+      "downloadURL": "sources/en.manga18-v2.aix",
       "languages": [
         "en"
       ],

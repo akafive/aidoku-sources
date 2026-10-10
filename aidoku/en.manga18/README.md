@@ -1,11 +1,9 @@
-# Manga18 Aidoku source
+# Manga18 Club Aidoku source
 
-Rust/WASM source for [Manga18FX](https://manga18fx.com) and its alternate domain
-[MANGA18.CLUB](https://manga18.club).
+Rust/WASM source for [Manga18 Club](https://manga18.club).
 
 The source supports search, latest/popular/genre listings, manga metadata, chapter lists,
-chapter page images, deep links, and switching between the two domains from Aidoku's source
-settings.
+chapter page images, and deep links.
 
 ## Build
 

@@ -1,13 +1,13 @@
 {
 	"info": {
 		"id": "en.manga18",
-		"name": "Manga18",
-		"version": 1,
-		"urls": [
-			"https://manga18.club"
-		],
+		"name": "Manga18 Club",
+		"version": 2,
+		"url": "https://manga18.club",
 		"contentRating": 2,
-		"languages": ["en"],
+		"languages": [
+			"en"
+		],
 		"minAppVersion": "0.7.1"
 	},
 	"listings": [
@@ -16,8 +16,8 @@
 			"name": "Latest Updates"
 		},
 		{
-			"id": "popular",
-			"name": "Popular Manga"
+			"id": "all",
+			"name": "All Manga"
 		},
 		{
 			"id": "manhwa",
@@ -29,7 +29,6 @@
 		}
 	],
 	"config": {
-		"allowsBaseUrlSelect": true,
 		"supportsTagSearch": true,
 		"hidesFiltersWhileSearching": true
 	}
